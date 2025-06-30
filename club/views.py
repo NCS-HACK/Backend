@@ -4,8 +4,12 @@ from .serializers import UserSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
+from rest_framework.permissions import AllowAny
+from rest_framework.decorators import permission_classes
+from .permissions import IsAdmin, IsBoardMember, IsSimpleMember, IsFinanceLeader, IsMarketingLeader, IsTechnicalTeamLeader, IsVisualCreationLeader, IsERLeader
 
 @api_view(['GET'])
+@permission_classes([IsAdmin, IsMarketingLeader])
 def user_list(request):
     users = User.objects.all()
     serializer = UserSerializer(users, many=True)
