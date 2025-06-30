@@ -1,6 +1,6 @@
 from django.shortcuts import render
-from .models import User, Task
-from .serializers import UserSerializer, TaskSerializer
+from .models import User, Task ,Event
+from .serializers import UserSerializer, TaskSerializer, EventSerializer
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
@@ -131,3 +131,89 @@ def delete_task(request, task_id):
 
     task.delete()
     return Response(status=204)
+
+
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_events(request):
+    user = request.user
+
+    if user.is_admin:
+        events = Event.objects.all()
+    elif user.is_board:
+        events = Event.objects.filter(department=user.department)
+    else:
+        events = Event.objects.filter(participants=user)
+
+    serializer = EventSerializer(events, many=True)
+    return Response(serializer.data)
+
+# 🟢 Create Event
+@api_view(['POST'])
+@permission_classes([IsBoardMember])
+def create_event(request):
+    user = request.user
+
+    if not user.is_board and not user.is_admin:
+        return Response({'detail': 'Permission denied'}, status=403)
+
+    data = request.data.copy()
+    data['created_by'] = user.id
+    data['department'] = user.department
+
+    serializer = EventSerializer(data=data)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# 🟢 Retrieve Single Event
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_event(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    user = request.user
+
+    if user.is_admin :
+        pass
+    elif user.is_board and event.department == user.department:
+        pass
+    elif user in event.participants.all():
+        pass
+    else:
+        return Response({'detail': 'Access denied'}, status=403)
+
+    serializer = EventSerializer(event)
+    return Response(serializer.data)
+
+# 🟡 Update Event
+@api_view(['PUT','PATCH'])
+@permission_classes([IsAuthenticated])
+def update_event(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    user = request.user
+
+    if not (user.is_admin or (user.is_board and event.department == user.department)):
+        return Response({'detail': 'Permission denied'}, status=403)
+
+    serializer = EventSerializer(event, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+# 🔴 Delete Event
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_event(request, event_id):
+    event = get_object_or_404(Event, id=event_id)
+    user = request.user
+
+    if not (user.is_admin or (user.is_board and event.department == user.department)):
+        return Response({'detail': 'Permission denied'}, status=403)
+
+    event.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

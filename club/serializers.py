@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Task
+from .models import User, Task, Event
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,3 +32,9 @@ class TaskSerializer(serializers.ModelSerializer):
             'department',
             'creator',
         ]
+
+class EventSerializer(serializers.ModelSerializer):
+    # participants = UserSerializer(many = True)
+    class Meta:
+        model = Event
+        fields = '__all__'

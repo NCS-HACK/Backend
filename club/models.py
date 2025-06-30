@@ -3,9 +3,10 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.contrib.auth.models import AbstractUser, Group, Permission
-
+from django.conf import settings
 
 from django.contrib.auth.models import BaseUserManager
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, password=None, **extra_fields):
@@ -18,16 +19,17 @@ class CustomUserManager(BaseUserManager):
         return user
 
     def create_superuser(self, email, password=None, **extra_fields):
-        extra_fields.setdefault('is_staff', True)
-        extra_fields.setdefault('is_superuser', True)
-        extra_fields.setdefault('is_admin', True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_admin", True)
 
-        if extra_fields.get('is_staff') is not True:
-            raise ValueError('Superuser must have is_staff=True.')
-        if extra_fields.get('is_superuser') is not True:
-            raise ValueError('Superuser must have is_superuser=True.')
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True.")
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True.")
 
         return self.create_user(email, password, **extra_fields)
+
 
 class User(AbstractUser):
     class Department(models.TextChoices):
@@ -49,11 +51,11 @@ class User(AbstractUser):
     department = models.CharField(
         max_length=20, choices=Department.choices, default=Department.FINANCE
     )
-    
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['first_name', 'last_name']
-    
-    objects = CustomUserManager() 
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["first_name", "last_name"]
+
+    objects = CustomUserManager()
 
     groups = models.ManyToManyField(
         Group,
@@ -69,7 +71,7 @@ class User(AbstractUser):
         help_text="Specific permissions for this user.",
         verbose_name="user permissions",
     )
-    
+
     def __str__(self):
         return f"{self.first_name} {self.last_name} -> ({self.department})"
 
@@ -107,3 +109,34 @@ class Task(models.Model):
 
     def __str__(self):
         return f"{self.title} [{self.status}]"
+
+
+class Event(models.Model):
+    class EventType(models.TextChoices):
+        MEETING = "meeting", "Meeting"
+        WORKSHOP = "workshop", "Workshop"
+        PARTY = "party", "Party"
+        COMPETITION = "competition", "Competition"
+        OTHER = "other", "Other"
+
+    class Status(models.TextChoices):
+        UPCOMING = "upcoming", "Upcoming"
+        ONGOING = "ongoing", "Ongoing"
+        COMPLETED = "completed", "Completed"
+        CANCELED = "canceled", "Canceled"
+
+    title = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=20, choices=EventType.choices, default=EventType.MEETING)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    location = models.CharField(max_length=255)
+    department = models.CharField(max_length=20, choices=User.Department.choices, null=True, blank=True)
+    participants = models.ManyToManyField(settings.AUTH_USER_MODEL, blank=True, related_name='events')
+    is_mandatory = models.BooleanField(default=False)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.UPCOMING)
+    event_photo = models.ImageField(upload_to='event_photos/', null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_time.strftime('%Y-%m-%d %H:%M')})"
