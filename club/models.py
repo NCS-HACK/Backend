@@ -94,7 +94,7 @@ class Task(models.Model):
     creator = models.ForeignKey(
         User, related_name="created_tasks", on_delete=models.CASCADE
     )
-    assignee = models.ForeignKey(
+    assigned_to = models.ForeignKey(
         User,
         related_name="assigned_tasks",
         on_delete=models.SET_NULL,

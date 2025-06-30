@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, Task
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -16,3 +16,19 @@ class UserSerializer(serializers.ModelSerializer):
         ]
     
     
+class TaskSerializer(serializers.ModelSerializer):
+    # creator = UserSerializer()
+    # assigned_to = UserSerializer()
+    class Meta:
+        model = Task
+        fields = [
+            'id',
+            'title',
+            'description',
+            'assigned_to',
+            'status',
+            'due_date',
+            'priority',
+            'department',
+            'creator',
+        ]

@@ -81,3 +81,12 @@ class IsHRLeader(BasePermission):
                 )
             )
         )
+
+
+class IsSelfOrBoard(BasePermission):
+    def has_permission(self, request, view):
+        # Allow safe methods only if authenticated
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        return request.user.is_board or obj == request.user
