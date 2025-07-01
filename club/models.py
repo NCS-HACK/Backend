@@ -140,3 +140,54 @@ class Event(models.Model):
 
     def __str__(self):
         return f"{self.title} ({self.start_time.strftime('%Y-%m-%d %H:%M')})"
+
+class File(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    file = models.FileField(upload_to='files/')
+    uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='uploaded_files'
+    )
+    department = models.CharField(
+        max_length=50,
+        choices=[(tag.name, tag.value) for tag in User.Department]
+    )
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    file_type = models.CharField(max_length=50, blank=True)
+    description = models.TextField(blank=True)
+    is_public = models.BooleanField(default=False)
+    last_accessed = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.name} uploaded by {self.uploaded_by}"
+    
+
+class Poll(models.Model):
+    question = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    is_active = models.BooleanField(default=True)
+    allowed_users = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name='allowed_polls')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.question
+
+class Choice(models.Model):
+    poll = models.ForeignKey(Poll, related_name='choices', on_delete=models.CASCADE)
+    text = models.CharField(max_length=255)
+
+    def __str__(self):
+        return self.text
+
+class Vote(models.Model):
+    poll = models.ForeignKey(Poll, on_delete=models.CASCADE, related_name="votes")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    choice = models.ForeignKey(Choice, on_delete=models.CASCADE, related_name="votes")
+    voted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('poll', 'user')

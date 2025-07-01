@@ -148,3 +148,6 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'club.User'  # <- Your custom user model
+
+MEDIA_URL = '/media/'
+MEDIA_ROOT = BASE_DIR / 'media'

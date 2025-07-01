@@ -1,14 +1,15 @@
 from django.shortcuts import render
-from .models import User, Task ,Event
-from .serializers import UserSerializer, TaskSerializer, EventSerializer
-from rest_framework.decorators import api_view
+from .models import User, Task ,Event, File, Poll, Choice, Vote
+from .serializers import UserSerializer, TaskSerializer, EventSerializer, FileSerializer, PollSerializer, ChoiceSerializer, VoteSerializer
+from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from django.shortcuts import get_object_or_404
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import permission_classes
 from .permissions import IsAdmin, IsBoardMember, IsSimpleMember, IsFinanceLeader, IsMarketingLeader, IsTechnicalTeamLeader, IsVisualCreationLeader, IsERLeader, IsSelfOrBoard
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework import status, viewsets, permissions
+from django.utils.timezone import now
 
 
 @api_view(['GET'])
@@ -217,3 +218,103 @@ def delete_event(request, event_id):
 
     event.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+class FileViewSet(viewsets.ModelViewSet):
+    queryset = File.objects.all()
+    serializer_class = FileSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def perform_create(self, serializer):
+        serializer.save(uploaded_by=self.request.user, department=self.request.user.department)
+
+    def get_queryset(self):
+        user = self.request.user
+        if user.is_admin:
+            return File.objects.all()
+        elif user.is_board:
+            return File.objects.filter(department=user.department)
+        else:
+            return File.objects.filter(uploaded_by=user)
+
+    def retrieve(self, request, *args, **kwargs):
+        file = self.get_object()
+        file.last_accessed = now()
+        file.save(update_fields=['last_accessed'])
+        return super().retrieve(request, *args, **kwargs)
+
+    @action(detail=False, methods=['get'])
+    def my_files(self, request):
+        """List files uploaded by the current user"""
+        files = File.objects.filter(uploaded_by=request.user)
+        serializer = self.get_serializer(files, many=True)
+        return Response(serializer.data)
+
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_poll(request):
+    serializer = PollSerializer(data=request.data)
+    if serializer.is_valid():
+        poll = serializer.save(created_by=request.user)
+        return Response(PollSerializer(poll).data, status=201)
+    return Response(serializer.errors, status=400)
+
+# 🔹 List all polls
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_polls(request):
+    polls = Poll.objects.all()
+    serializer = PollSerializer(polls, many=True)
+    return Response(serializer.data)
+
+# 🔹 Retrieve a poll by ID
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def poll_detail(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    serializer = PollSerializer(poll)
+    return Response(serializer.data)
+
+# 🔹 Update a poll
+@api_view(['PUT'])
+@permission_classes([IsAuthenticated])
+def update_poll(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    if poll.created_by != request.user and not request.user.is_admin:
+        return Response({"detail": "Permission denied"}, status=403)
+
+    serializer = PollSerializer(poll, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(PollSerializer(poll).data)
+    return Response(serializer.errors, status=400)
+
+# 🔹 Delete a poll
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_poll(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    if poll.created_by != request.user and not request.user.is_admin:
+        return Response({"detail": "Permission denied"}, status=403)
+
+    poll.delete()
+    return Response({"message": "Poll deleted"}, status=204)
+
+# 🔹 Submit a vote
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def vote_poll(request, poll_id):
+    poll = get_object_or_404(Poll, id=poll_id)
+    if request.user not in poll.allowed_users.all():
+        return Response({"detail": "You are not allowed to vote in this poll."}, status=403)
+
+    existing_vote = Vote.objects.filter(user=request.user, poll=poll).first()
+    if existing_vote:
+        return Response({"detail": "You have already voted in this poll."}, status=400)
+
+    serializer = VoteSerializer(data=request.data, context={'request': request, 'poll': poll})
+    if serializer.is_valid():
+        serializer.save(user=request.user, poll=poll)
+        return Response({"message": "Vote recorded successfully."}, status=201)
+    return Response(serializer.errors, status=400)
